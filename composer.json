@@ -1,7 +1,7 @@
 {
     "name": "brainswarm/cleanup",
     "type": "typo3-flow-package",
-    "description": "Add description here",
+    "description": "This package looks for unused resources and deletes them on disc. It does that via a command controller.",
     "require": {
         "typo3/flow": "*"
     },
