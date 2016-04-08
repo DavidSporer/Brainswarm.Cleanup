@@ -15,7 +15,8 @@ use TYPO3\Flow\Annotations as Flow;
  *
  * @Flow\Scope("singleton")
  */
-class ResourcesCommandController extends \TYPO3\Flow\Cli\CommandController {
+class ResourcesCommandController extends \TYPO3\Flow\Cli\CommandController
+{
 
     /**
      * @Flow\Inject
@@ -27,15 +28,16 @@ class ResourcesCommandController extends \TYPO3\Flow\Cli\CommandController {
      * Fetches the public header and footer menues from passcreator.de
      * @return void
      */
-    public function cleanupCommand(){
+    public function cleanupCommand()
+    {
         $this->createLogger();
 
         $result = $this->resourceCleanupService->cleanOrphanedResources(50000, $this->logger);
-        //echo 'freed space: '.$result['FREED SPACE:'];
-        $this->response->appendContent('deleted files: '.count($result['DELETED FILE:']) . "\n");
+        $this->response->appendContent('deleted files: ' . $result . "\n");
     }
 
-    protected function createLogger() {
+    protected function createLogger()
+    {
         $this->logger = \TYPO3\Flow\Log\LoggerFactory::create(
             'myLoggerName',
             'TYPO3\Flow\Log\Logger',

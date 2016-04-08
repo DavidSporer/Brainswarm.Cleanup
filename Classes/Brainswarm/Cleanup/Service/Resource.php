@@ -36,7 +36,7 @@ class Resource
     /**
      * @param int $maximumNumberOfResourcesToCleanup
      * @param LoggerInterface $logger
-     * @return array
+     * @return int
      * @throws DBALException
      */
     public function cleanOrphanedResources($maximumNumberOfResourcesToCleanup, LoggerInterface $logger)
@@ -93,11 +93,6 @@ class Resource
 
         $logger->log("\n\n\nNo of deleted files: " . count($deletedFiles) . "\nNo of deleted resources: " . count($deletedResources));
 
-        return array(
-            'DELETED FILE:' => $deletedFiles,
-            'DELETED RESOURCE: ' => $deletedResources,
-            'RESOURCE IN USE:' => $usedResources,
-            'FREED SPACE:' => $sum
-        );
+        return count($deletedFiles);
     }
 }
