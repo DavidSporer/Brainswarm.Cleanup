@@ -50,6 +50,7 @@ class Resource
         $deletedFiles = array();
         $deletedResources = array();
         $usedResources = array();
+        echo 'start reading folder ' . $directoryName . "\n";
         while (false !== ($filename = readdir($dh))) {
             if (is_file($directoryName . $filename)) {
                 $query = $connection->prepare('SELECT persistence_object_identifier FROM typo3_flow_resource_resource WHERE resourcepointer = ?;');
@@ -81,6 +82,7 @@ class Resource
                         }
                         unlink($directoryName);
                     } catch (DBALException $e) {
+                        echo 'found used resource, skipping.' . "\n";
                         $usedResources[] = $filename;
                     }
                 }
