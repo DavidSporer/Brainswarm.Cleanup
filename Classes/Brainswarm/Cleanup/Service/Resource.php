@@ -74,10 +74,7 @@ class Resource
     {
         $directoryName = FLOW_PATH_DATA . 'Persistent/Resources/';
         $dh = opendir($directoryName);
-        /** @var $em \Doctrine\ORM\EntityManager */
-        $em = $this->entityManager;
-        $connection = $em->getConnection();
-        $sum = 0;
+
         echo 'start reading folder ' . $directoryName . "\n";
         while (false !== ($filename = readdir($dh))) {
             if (is_file($directoryName . $filename)) {
@@ -97,19 +94,17 @@ class Resource
     protected function cleanUpResourceByResourcepointer($resourcepointer, LoggerInterface $logger)
     {
         $directoryName = FLOW_PATH_DATA . 'Persistent/Resources/';
-        $dh = opendir($directoryName);
         /** @var $em \Doctrine\ORM\EntityManager */
         $em = $this->entityManager;
         $connection = $em->getConnection();
-        $sum = 0;
-
+        
         $query = $connection->prepare('SELECT persistence_object_identifier FROM typo3_flow_resource_resource WHERE resourcepointer = ?;');
         $query->execute(array($resourcepointer));
         $result = $query->fetchAll();
         if (!$result) {
             $query = $connection->prepare('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = ?');
             $query->execute(array($resourcepointer));
-            $sum += filesize($directoryName . $resourcepointer);
+
             foreach (glob(FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*') as $published) {
                 unlink($published);
             }
@@ -126,7 +121,7 @@ class Resource
                     $deletedResources[] = $resourceIdentifier;
                 }
                 $connection->executeQuery('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = ?');
-                $sum += filesize($directoryName . $resourcepointer);
+
                 foreach (glob(FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*') as $published) {
                     unlink($published);
                 }
@@ -135,7 +130,6 @@ class Resource
 				echo FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n";
 				$logger->log('deleted file ' . FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n");
             } catch (DBALException $e) {
-                //echo 'found used resource (filename: '.$resourcepointer.'), skipping.' . "\n";
                 $this->usedResources[] = $resourcepointer;
             }
         }
