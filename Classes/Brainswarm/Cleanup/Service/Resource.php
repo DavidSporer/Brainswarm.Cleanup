@@ -34,12 +34,43 @@ class Resource
     protected $persistenceManager;
 
     /**
+     * @var array
+     */
+    protected $usedResources;
+
+    /**
+     * @var array
+     */
+    protected $deletedResources;
+
+    /**
+     * @var array
+     */
+    protected $deletedFiles;
+
+    public function cleanUnusedResources($numberOfResourcesToCleanup, $offset, LoggerInterface $logger)
+    {
+        $em = $this->entityManager;
+        $connection = $em->getConnection();
+		$sql = 'SELECT resourcepointer, persistence_object_identifier FROM typo3_flow_resource_resource LIMIT '.$numberOfResourcesToCleanup.' OFFSET '.$offset.';';
+		echo $sql . "\n";
+        $query = $connection->prepare($sql);
+        $query->execute();
+        $result = $query->fetchAll();
+
+        foreach ($result as $resultSet) {
+            $resourcepointer = $resultSet['resourcepointer'];
+            $this->cleanUpResourceByResourcepointer($resourcepointer, $logger);
+        }
+    }
+
+    /**
      * @param int $maximumNumberOfResourcesToCleanup
      * @param LoggerInterface $logger
      * @return int
      * @throws DBALException
      */
-    public function cleanOrphanedResources($maximumNumberOfResourcesToCleanup, LoggerInterface $logger)
+    public function cleanOrphanedResources(LoggerInterface $logger)
     {
         $directoryName = FLOW_PATH_DATA . 'Persistent/Resources/';
         $dh = opendir($directoryName);
@@ -47,54 +78,67 @@ class Resource
         $em = $this->entityManager;
         $connection = $em->getConnection();
         $sum = 0;
-        $deletedFiles = array();
-        $deletedResources = array();
-        $usedResources = array();
         echo 'start reading folder ' . $directoryName . "\n";
         while (false !== ($filename = readdir($dh))) {
             if (is_file($directoryName . $filename)) {
-                $query = $connection->prepare('SELECT persistence_object_identifier FROM typo3_flow_resource_resource WHERE resourcepointer = ?;');
-                $query->execute(array($filename));
-                $result = $query->fetchAll();
-                if (!$result) {
-                    $query = $connection->prepare('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = ?');
-                    $query->execute(array($filename));
-                    $sum += filesize($directoryName . $filename);
-                    foreach (glob(FLOW_PATH_WEB . '_Resources/Persistent/' . $filename . '*.*') as $published) {
-                        unlink($published);
-                    }
-                    unlink($directoryName . $filename);
-                    $deletedFiles[] = $filename;
-                    echo FLOW_PATH_WEB . '_Resources/Persistent/' . $filename . '*.*' . "\n";
-                    $logger->log('deleted file ' . FLOW_PATH_WEB . '_Resources/Persistent/' . $filename . '*.*' . "\n");
-                } else {
-                    try {
-                        foreach ($result as $resultSet) {
-                            $resourceIdentifier = $resultSet['persistence_object_identifier'];
-                            $query = $connection->prepare('DELETE FROM typo3_flow_resource_resource WHERE resourcepointer = ?');
-                            $query->execute(array($resourceIdentifier));
-                            $deletedResources[] = $resourceIdentifier;
-                        }
-                        $connection->executeQuery('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = ?');
-                        $sum += filesize($directoryName . $filename);
-                        foreach (glob(FLOW_PATH_WEB . '_Resources/Persistent/' . $filename . '*') as $published) {
-                            unlink($published);
-                        }
-                        unlink($directoryName);
-                    } catch (DBALException $e) {
-                        echo 'found used resource, skipping.' . "\n";
-                        $usedResources[] = $filename;
-                    }
-                }
-            }
-
-            if (count($deletedFiles) > $maximumNumberOfResourcesToCleanup) {
-                break;
+                $this->cleanUpResourceByResourcepointer($filename, $logger);
             }
         }
 
-        $logger->log("\n\n\nNo of deleted files: " . count($deletedFiles) . "\nNo of deleted resources: " . count($deletedResources));
+        $logger->log("\n\n\nNo of deleted files: " . count($this->deletedFiles) . "\nNo of deleted resources: " . count($this->deletedResources));
 
-        return count($deletedFiles);
+        return count($this->deletedFiles);
     }
+
+    /**
+     * @param $resourcepointer
+     * @param LoggerInterface $logger
+     */
+    protected function cleanUpResourceByResourcepointer($resourcepointer, LoggerInterface $logger)
+    {
+        $directoryName = FLOW_PATH_DATA . 'Persistent/Resources/';
+        $dh = opendir($directoryName);
+        /** @var $em \Doctrine\ORM\EntityManager */
+        $em = $this->entityManager;
+        $connection = $em->getConnection();
+        $sum = 0;
+
+        $query = $connection->prepare('SELECT persistence_object_identifier FROM typo3_flow_resource_resource WHERE resourcepointer = ?;');
+        $query->execute(array($resourcepointer));
+        $result = $query->fetchAll();
+        if (!$result) {
+            $query = $connection->prepare('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = ?');
+            $query->execute(array($resourcepointer));
+            $sum += filesize($directoryName . $resourcepointer);
+            foreach (glob(FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*') as $published) {
+                unlink($published);
+            }
+            unlink($directoryName . $resourcepointer);
+            $deletedFiles[] = $resourcepointer;
+            echo FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n";
+            $logger->log('deleted file ' . FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n");
+        } else {
+            try {
+                foreach ($result as $resultSet) {
+                    $resourceIdentifier = $resultSet['persistence_object_identifier'];
+                    $query = $connection->prepare('DELETE FROM typo3_flow_resource_resource WHERE persistence_object_identifier = ?');
+                    $query->execute(array($resourceIdentifier));
+                    $deletedResources[] = $resourceIdentifier;
+                }
+                $connection->executeQuery('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = ?');
+                $sum += filesize($directoryName . $resourcepointer);
+                foreach (glob(FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*') as $published) {
+                    unlink($published);
+                }
+                unlink($directoryName . $resourcepointer);
+				
+				echo FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n";
+				$logger->log('deleted file ' . FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n");
+            } catch (DBALException $e) {
+                //echo 'found used resource (filename: '.$resourcepointer.'), skipping.' . "\n";
+                $this->usedResources[] = $resourcepointer;
+            }
+        }
+    }
+
 }

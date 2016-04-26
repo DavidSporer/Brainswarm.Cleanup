@@ -19,21 +19,71 @@ class ResourcesCommandController extends \TYPO3\Flow\Cli\CommandController
 {
 
     /**
+     * @var \TYPO3\Flow\Resource\ResourceManager
+     * @Flow\Inject
+     */
+    protected $resourceManager;
+    /**
+     * @var \Doctrine\Common\Persistence\ObjectManager
+     * @Flow\Inject
+     */
+    protected $entityManager;
+    /**
+     * @Flow\Inject
+     * @var \TYPO3\Flow\Persistence\PersistenceManagerInterface
+     */
+    protected $persistenceManager;
+
+    /**
      * @Flow\Inject
      * @var Resource
      */
     protected $resourceCleanupService;
 
     /**
-     * Fetches the public header and footer menues from passcreator.de
+     * Iterates over all resources on the filesystem and looks if they are still used. If not they're deleted.
      * @return void
      */
     public function cleanupCommand()
     {
         $this->createLogger();
 
-        $result = $this->resourceCleanupService->cleanOrphanedResources(50000, $this->logger);
+        $result = $this->resourceCleanupService->cleanOrphanedResources($this->logger);
         $this->response->appendContent('deleted files: ' . $result . "\n");
+    }
+
+    /**
+     * Looks in the database for unused resources and deletes them from the database and the file storage
+     * @return  void
+     */
+    public function cleanupByDbCommand() {
+        $this->createLogger();
+
+        $em = $this->entityManager;
+        $connection = $em->getConnection();
+        $query = $connection->prepare('SELECT * FROM typo3_flow_resource_resource;');
+        $query->execute();
+        $result = $query->fetchAll();
+
+        $numberOfResources = count($result);
+
+		echo 'number of resources: '. $numberOfResources . " \n";
+		
+        // how many resources should be cleaned in one chunk
+        $interval = 40000;
+
+        $numberOfChunks = round($numberOfResources / $interval) + 1;
+
+        $offset = 0;
+        $index = 0;
+
+        while($index < $numberOfChunks) {
+            $this->resourceCleanupService->cleanUnusedResources($interval, $offset, $this->logger);
+
+            $index++;
+            $offset = $index * $interval;
+        }
+
     }
 
     protected function createLogger()
