@@ -52,8 +52,8 @@ class Resource
     {
         $em = $this->entityManager;
         $connection = $em->getConnection();
-		$sql = 'SELECT resourcepointer, persistence_object_identifier FROM typo3_flow_resource_resource LIMIT '.$numberOfResourcesToCleanup.' OFFSET '.$offset.';';
-		echo $sql . "\n";
+        $sql = 'SELECT resourcepointer, persistence_object_identifier FROM typo3_flow_resource_resource LIMIT ' . $numberOfResourcesToCleanup . ' OFFSET ' . $offset . ';';
+        echo $sql . "\n";
         $query = $connection->prepare($sql);
         $query->execute();
         $result = $query->fetchAll();
@@ -97,7 +97,7 @@ class Resource
         /** @var $em \Doctrine\ORM\EntityManager */
         $em = $this->entityManager;
         $connection = $em->getConnection();
-        
+
         $query = $connection->prepare('SELECT persistence_object_identifier FROM typo3_flow_resource_resource WHERE resourcepointer = ?;');
         $query->execute(array($resourcepointer));
         $result = $query->fetchAll();
@@ -120,16 +120,17 @@ class Resource
                     $query->execute(array($resourceIdentifier));
                     $deletedResources[] = $resourceIdentifier;
                 }
-                $connection->executeQuery('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = ?');
+                $connection->executeQuery('DELETE FROM typo3_flow_resource_resourcepointer WHERE hash = \''. $resourcepointer.'\'');
 
                 foreach (glob(FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*') as $published) {
                     unlink($published);
                 }
                 unlink($directoryName . $resourcepointer);
-				
-				echo FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n";
-				$logger->log('deleted file ' . FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n");
+
+                echo FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n";
+                $logger->log('deleted file ' . FLOW_PATH_WEB . '_Resources/Persistent/' . $resourcepointer . '*.*' . "\n");
             } catch (DBALException $e) {
+                $logger->log('Exception occurred while deleting resource with hash ' . $resourcepointer . '. The error was: ' . $e->getMessage() . "\n");
                 $this->usedResources[] = $resourcepointer;
             }
         }
